@@ -18,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _groupCodeController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -27,6 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _groupCodeController.dispose();
     super.dispose();
   }
 
@@ -39,16 +41,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        groupCode: _groupCodeController.text.trim(),
       );
       if (mounted) {
-        final needsConfirmation = response.user?.emailConfirmedAt == null &&
-            response.session == null;
-
+        final needsConfirmation =
+            response.user?.emailConfirmedAt == null && response.session == null;
         if (needsConfirmation) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text(
-                  'Account created! Please check your email to verify your account, then sign in.'),
+                  'Account created! Check your email to verify, then sign in.'),
               backgroundColor: Colors.green.shade700,
               duration: const Duration(seconds: 5),
             ),
@@ -86,7 +88,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -136,6 +138,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ).animate().fadeIn(delay: 100.ms),
                     SizedBox(height: isCompact ? 28 : 36),
                     TextFormField(
+                      controller: _groupCodeController,
+                      textInputAction: TextInputAction.next,
+                      decoration: InputDecoration(
+                        labelText: 'Group Code',
+                        prefixIcon: const Icon(Icons.group_outlined),
+                        hintText: 'Enter code (e.g. 0000 for open)',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withAlpha(40),
+                          fontSize: 13,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a group code';
+                        }
+                        return null;
+                      },
+                    ).animate().fadeIn(delay: 150.ms).slideX(begin: -0.08),
+                    const SizedBox(height: 14),
+                    TextFormField(
                       controller: _nameController,
                       textCapitalization: TextCapitalization.words,
                       autofillHints: const [AutofillHints.name],
@@ -150,7 +172,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                         return null;
                       },
-                    ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.08),
+                    ).animate().fadeIn(delay: 250.ms).slideX(begin: -0.08),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _emailController,
@@ -170,7 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                         return null;
                       },
-                    ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.08),
+                    ).animate().fadeIn(delay: 350.ms).slideX(begin: -0.08),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _passwordController,
@@ -200,7 +222,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                         return null;
                       },
-                    ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.08),
+                    ).animate().fadeIn(delay: 450.ms).slideX(begin: -0.08),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _confirmPasswordController,
@@ -217,7 +239,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                       onFieldSubmitted: (_) => _register(),
-                    ).animate().fadeIn(delay: 500.ms).slideX(begin: -0.08),
+                    ).animate().fadeIn(delay: 550.ms).slideX(begin: -0.08),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -233,7 +255,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               )
                             : const Text('Create Account'),
                       ),
-                    ).animate().fadeIn(delay: 600.ms),
+                    ).animate().fadeIn(delay: 650.ms),
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -259,7 +281,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ],
                         ),
                       ),
-                    ).animate().fadeIn(delay: 700.ms),
+                    ).animate().fadeIn(delay: 750.ms),
                     const SizedBox(height: 16),
                   ],
                 ),

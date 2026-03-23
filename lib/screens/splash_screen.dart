@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
     if (AuthService.isLoggedIn) {
-      await AuthService.refreshAdminStatus();
+      await AuthService.refreshProfile();
     }
     if (!mounted) return;
     Navigator.pushReplacementNamed(

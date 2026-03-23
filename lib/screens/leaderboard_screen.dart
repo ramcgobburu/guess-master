@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/leaderboard_entry.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 
@@ -55,7 +56,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Leaderboard'),
+        title: Text(AuthService.groupName.isNotEmpty
+            ? '${AuthService.groupName} Leaderboard'
+            : 'Leaderboard'),
       ),
       body: RefreshIndicator(
         onRefresh: _loadLeaderboard,

@@ -3,6 +3,8 @@ import '../models/match.dart';
 import '../models/prediction.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/actual.dart';
+import '../models/group.dart';
+import '../services/auth_service.dart';
 
 class ApiService {
   static Future<List<Match>> getActiveMatches() async {
@@ -12,7 +14,7 @@ class ApiService {
         .select()
         .eq('is_locked', false)
         .gte('start_date_time', now.toIso8601String())
-        .order('start_date_time');
+        .order('start_date_time', ascending: true);
 
     return (response as List).map((json) => Match.fromSupabase(json)).toList();
   }
@@ -21,7 +23,7 @@ class ApiService {
     final response = await supabase
         .from('matches')
         .select()
-        .order('start_date_time');
+        .order('start_date_time', ascending: true);
 
     return (response as List).map((json) => Match.fromSupabase(json)).toList();
   }
@@ -45,8 +47,12 @@ class ApiService {
     );
   }
 
-  static Future<List<LeaderboardEntry>> getLeaderboard() async {
-    final response = await supabase.rpc('get_leaderboard');
+  static Future<List<LeaderboardEntry>> getLeaderboard({String? groupId}) async {
+    final gid = groupId ?? AuthService.groupId;
+    final response = await supabase.rpc(
+      'get_leaderboard',
+      params: gid != null ? {'p_group_id': gid} : {},
+    );
     return (response as List)
         .map((json) => LeaderboardEntry.fromJson(json))
         .toList();
@@ -102,5 +108,54 @@ class ApiService {
         .select('id')
         .eq('match_id', matchId);
     return (response as List).length;
+  }
+
+  // --- Group methods ---
+
+  static Future<List<Group>> getAllGroups() async {
+    final response = await supabase
+        .from('groups')
+        .select()
+        .eq('is_active', true)
+        .order('created_at', ascending: true);
+    return (response as List).map((json) => Group.fromSupabase(json)).toList();
+  }
+
+  static Future<Group?> getGroupByCode(String code) async {
+    final response = await supabase
+        .from('groups')
+        .select()
+        .eq('code', code)
+        .eq('is_active', true)
+        .maybeSingle();
+    if (response == null) return null;
+    return Group.fromSupabase(response);
+  }
+
+  static Future<void> createGroup({
+    required String name,
+    required String code,
+  }) async {
+    await supabase.from('groups').insert({
+      'name': name,
+      'code': code,
+      'created_by': AuthService.userId,
+    });
+  }
+
+  static Future<List<GroupStats>> getGroupStats() async {
+    final response = await supabase.rpc('get_group_stats');
+    return (response as List)
+        .map((json) => GroupStats.fromJson(json))
+        .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> getGroupMembers(String groupId) async {
+    final response = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .eq('group_id', groupId)
+        .order('name', ascending: true);
+    return List<Map<String, dynamic>>.from(response);
   }
 }

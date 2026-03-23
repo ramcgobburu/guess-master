@@ -17,16 +17,49 @@ class AuthService {
   static bool _isAdmin = false;
   static bool get isAdmin => _isAdmin;
 
+  static String? _groupId;
+  static String? get groupId => _groupId;
+
+  static String _groupName = '';
+  static String get groupName => _groupName;
+
+  static String _groupCode = '';
+  static String get groupCode => _groupCode;
+
   static Future<AuthResponse> signUp({
     required String email,
     required String password,
     required String name,
+    required String groupCode,
   }) async {
-    return await supabase.auth.signUp(
+    final groupResponse = await supabase
+        .from('groups')
+        .select()
+        .eq('code', groupCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+    if (groupResponse == null) {
+      throw Exception('Invalid group code. Please check and try again.');
+    }
+
+    final authResponse = await supabase.auth.signUp(
       email: email,
       password: password,
       data: {'name': name},
     );
+
+    if (authResponse.user != null) {
+      await supabase.from('profiles').upsert({
+        'id': authResponse.user!.id,
+        'name': name,
+        'email': email,
+        'group_id': groupResponse['id'],
+        'is_admin': false,
+      }, onConflict: 'id');
+    }
+
+    return authResponse;
   }
 
   static Future<void> signIn({
@@ -37,33 +70,51 @@ class AuthService {
       email: email,
       password: password,
     );
-    await _loadAdminStatus();
+    await _loadProfile();
   }
 
   static Future<void> signOut() async {
     _isAdmin = false;
+    _groupId = null;
+    _groupName = '';
+    _groupCode = '';
     await supabase.auth.signOut();
   }
 
-  static Future<void> _loadAdminStatus() async {
+  static Future<void> _loadProfile() async {
     if (currentUser == null) {
       _isAdmin = false;
+      _groupId = null;
+      _groupName = '';
+      _groupCode = '';
       return;
     }
     try {
       final profile = await supabase
           .from('profiles')
-          .select('is_admin')
+          .select('is_admin, group_id')
           .eq('id', currentUser!.id)
           .maybeSingle();
       _isAdmin = profile?['is_admin'] == true;
+      _groupId = profile?['group_id'];
+
+      if (_groupId != null) {
+        final group = await supabase
+            .from('groups')
+            .select('name, code')
+            .eq('id', _groupId!)
+            .maybeSingle();
+        _groupName = group?['name'] ?? '';
+        _groupCode = group?['code'] ?? '';
+      }
     } catch (_) {
       _isAdmin = false;
+      _groupId = null;
     }
   }
 
-  static Future<void> refreshAdminStatus() async {
-    await _loadAdminStatus();
+  static Future<void> refreshProfile() async {
+    await _loadProfile();
   }
 
   static Future<Map<String, dynamic>?> getProfile() async {

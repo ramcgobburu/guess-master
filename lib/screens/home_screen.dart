@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get _userName => AuthService.userName;
   String get _userEmail => AuthService.userEmail;
+  String get _groupName => AuthService.groupName;
 
   @override
   void initState() {
@@ -376,12 +377,35 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                _showSchedule ? 'Match Schedule' : 'Next Prediction',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(color: Colors.white54),
+                              Row(
+                                children: [
+                                  Text(
+                                    _showSchedule ? 'Match Schedule' : 'Next Prediction',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: Colors.white54),
+                                  ),
+                                  if (_groupName.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.deepPurple.withAlpha(60),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        _groupName,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppTheme.accentOrange,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),

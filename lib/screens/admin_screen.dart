@@ -71,6 +71,13 @@ class _AdminScreenState extends State<AdminScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Admin Panel'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.group, size: 22),
+            tooltip: 'Groups Dashboard',
+            onPressed: () => Navigator.pushNamed(context, '/admin-groups'),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,

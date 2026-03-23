@@ -11,6 +11,7 @@ import 'screens/my_predictions_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/admin_screen.dart';
 import 'screens/admin_enter_result_screen.dart';
+import 'screens/admin_groups_screen.dart';
 import 'screens/forgot_password_screen.dart';
 
 Future<void> main() async {
@@ -57,6 +58,7 @@ class GuessMasterApp extends StatelessWidget {
         '/leaderboard': (context) => const LeaderboardScreen(),
         '/admin': (context) => const AdminScreen(),
         '/admin-enter-result': (context) => const AdminEnterResultScreen(),
+        '/admin-groups': (context) => const AdminGroupsScreen(),
       },
     );
   }
