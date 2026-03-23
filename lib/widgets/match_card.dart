@@ -5,11 +5,13 @@ import '../theme/app_theme.dart';
 
 class MatchCard extends StatelessWidget {
   final Match match;
+  final MatchStatus matchStatus;
   final VoidCallback onPredict;
 
   const MatchCard({
     super.key,
     required this.match,
+    required this.matchStatus,
     required this.onPredict,
   });
 
@@ -17,7 +19,7 @@ class MatchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final team1Color = TeamColors.getColor(match.team1);
     final team2Color = TeamColors.getColor(match.team2);
-    final canPredict = match.canPredict;
+    final isOpen = matchStatus == MatchStatus.open;
     final screenW = MediaQuery.sizeOf(context).width;
     final isCompact = screenW < 375;
     final badgeSize = isCompact ? 56.0 : 64.0;
@@ -29,9 +31,9 @@ class MatchCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            team1Color.withAlpha(50),
+            team1Color.withAlpha(matchStatus == MatchStatus.completed ? 20 : 50),
             AppTheme.cardDark,
-            team2Color.withAlpha(50),
+            team2Color.withAlpha(matchStatus == MatchStatus.completed ? 20 : 50),
           ],
           stops: const [0.0, 0.5, 1.0],
           begin: Alignment.centerLeft,
@@ -43,133 +45,174 @@ class MatchCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: canPredict ? onPredict : null,
-          child: Padding(
-            padding: EdgeInsets.all(cardPad),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Match ${match.matchId}',
-                      style: TextStyle(
-                        color: Colors.white.withAlpha(100),
-                        fontSize: 11,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.w500,
+          onTap: isOpen ? onPredict : null,
+          child: Opacity(
+            opacity: matchStatus == MatchStatus.completed ? 0.5 : 1.0,
+            child: Padding(
+              padding: EdgeInsets.all(cardPad),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Match ${match.matchId}',
+                        style: TextStyle(
+                          color: Colors.white.withAlpha(100),
+                          fontSize: 11,
+                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    if (match.venue.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.location_on,
-                          size: 10, color: Colors.white.withAlpha(80)),
-                      const SizedBox(width: 2),
-                      Flexible(
-                        child: Text(
-                          match.venue.split(',').first,
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(80),
-                            fontSize: 10,
+                      if (match.venue.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.location_on,
+                            size: 10, color: Colors.white.withAlpha(80)),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            match.venue.split(',').first,
+                            style: TextStyle(
+                              color: Colors.white.withAlpha(80),
+                              fontSize: 10,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: isCompact ? 12 : 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TeamBadge(
+                          team: match.team1,
+                          color: team1Color,
+                          size: badgeSize,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(12),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                'VS',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isCompact ? 12 : 13,
+                                  color: AppTheme.accentOrange,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              DateFormat('MMM dd, hh:mm a')
+                                  .format(match.startDateTime.toLocal()),
+                              style: TextStyle(
+                                color: Colors.white.withAlpha(160),
+                                fontSize: isCompact ? 10 : 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: _TeamBadge(
+                          team: match.team2,
+                          color: team2Color,
+                          size: badgeSize,
                         ),
                       ),
                     ],
-                  ],
-                ),
-                SizedBox(height: isCompact ? 12 : 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _TeamBadge(
-                        team: match.team1,
-                        color: team1Color,
-                        size: badgeSize,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(12),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              'VS',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isCompact ? 12 : 13,
-                                color: AppTheme.accentOrange,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            DateFormat('MMM dd, hh:mm a')
-                                .format(match.startDateTime.toLocal()),
-                            style: TextStyle(
-                              color: Colors.white.withAlpha(160),
-                              fontSize: isCompact ? 10 : 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: _TeamBadge(
-                        team: match.team2,
-                        color: team2Color,
-                        size: badgeSize,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isCompact ? 12 : 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: canPredict
-                      ? ElevatedButton(
-                          onPressed: onPredict,
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          child: const Text('Make Prediction'),
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.white.withAlpha(8),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'Predictions Locked',
-                              style: TextStyle(
-                                color: Colors.white30,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                ),
-              ],
+                  ),
+                  SizedBox(height: isCompact ? 12 : 14),
+                  _buildActionButton(),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton() {
+    switch (matchStatus) {
+      case MatchStatus.open:
+        return SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton(
+            onPressed: onPredict,
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            child: const Text('Make Prediction'),
+          ),
+        );
+      case MatchStatus.locked:
+        return _statusBadge(
+          icon: Icons.lock_outline,
+          text: 'Predictions Locked',
+          color: Colors.red.shade300,
+        );
+      case MatchStatus.completed:
+        return _statusBadge(
+          icon: Icons.check_circle_outline,
+          text: 'Match Started',
+          color: Colors.white30,
+        );
+      case MatchStatus.upcoming:
+        return _statusBadge(
+          icon: Icons.schedule,
+          text: 'Opens after previous match starts',
+          color: Colors.amber.shade300,
+        );
+    }
+  }
+
+  Widget _statusBadge({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: 44,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withAlpha(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

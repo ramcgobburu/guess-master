@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 import '../models/match.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -16,11 +17,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  List<Match> _upcomingMatches = [];
   List<Match> _allMatches = [];
   bool _isLoading = true;
   String? _error;
-  bool _showAll = false;
+  bool _showSchedule = false;
 
   String get _userName => AuthService.userName;
   String get _userEmail => AuthService.userEmail;
@@ -37,14 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        ApiService.getActiveMatches(),
-        ApiService.getAllMatches(),
-      ]);
+      final matches = await ApiService.getAllMatches();
       if (mounted) {
         setState(() {
-          _upcomingMatches = results[0];
-          _allMatches = results[1];
+          _allMatches = matches;
           _isLoading = false;
         });
       }
@@ -58,7 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<Match> get _displayedMatches => _showAll ? _allMatches : _upcomingMatches;
+  Match? get _nextPredictableMatch {
+    for (int i = 0; i < _allMatches.length; i++) {
+      final match = _allMatches[i];
+      final prev = i > 0 ? _allMatches[i - 1] : null;
+      if (match.statusInContext(prev) == MatchStatus.open) {
+        return match;
+      }
+    }
+    return null;
+  }
+
+  Match? _getPreviousMatch(Match match) {
+    final idx = _allMatches.indexWhere((m) => m.matchId == match.matchId);
+    if (idx <= 0) return null;
+    return _allMatches[idx - 1];
+  }
 
   void _onTabTapped(int index) {
     if (index == _currentIndex) return;
@@ -180,6 +191,157 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPredictTab(double hPad) {
+    final nextMatch = _nextPredictableMatch;
+
+    if (nextMatch == null) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.hourglass_empty,
+                  size: 56, color: Colors.white.withAlpha(50)),
+              const SizedBox(height: 14),
+              Text(
+                'No match open for prediction',
+                style: TextStyle(
+                    color: Colors.white.withAlpha(140), fontSize: 15),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Next match opens once the current one starts',
+                style: TextStyle(
+                    color: Colors.white.withAlpha(70), fontSize: 13),
+              ),
+              const SizedBox(height: 18),
+              TextButton(
+                onPressed: () => setState(() => _showSchedule = true),
+                child: const Text('View Schedule',
+                    style: TextStyle(color: AppTheme.accentOrange)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final timeUntilLock = nextMatch.lockTime.difference(DateTime.now().toUtc());
+    final hoursLeft = timeUntilLock.inHours;
+    final minsLeft = timeUntilLock.inMinutes % 60;
+    String countdown;
+    if (hoursLeft > 24) {
+      final days = (hoursLeft / 24).floor();
+      countdown = '${days}d ${hoursLeft % 24}h left to predict';
+    } else if (hoursLeft > 0) {
+      countdown = '${hoursLeft}h ${minsLeft}m left to predict';
+    } else {
+      countdown = '${timeUntilLock.inMinutes}m left to predict';
+    }
+
+    return SliverToBoxAdapter(
+      child: ResponsiveCenter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: hPad - 4),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentOrange.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.accentOrange.withAlpha(50)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.timer_outlined,
+                        size: 16, color: AppTheme.accentOrange),
+                    const SizedBox(width: 6),
+                    Text(
+                      countdown,
+                      style: const TextStyle(
+                        color: AppTheme.accentOrange,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ).animate().fadeIn(),
+              const SizedBox(height: 12),
+              MatchCard(
+                match: nextMatch,
+                matchStatus: MatchStatus.open,
+                onPredict: () {
+                  Navigator.pushNamed(
+                    context,
+                    '/predict',
+                    arguments: {'match': nextMatch},
+                  ).then((_) => _loadData());
+                },
+              ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.08),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleTab(double hPad) {
+    if (_allMatches.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today,
+                  size: 56, color: Colors.white.withAlpha(50)),
+              const SizedBox(height: 14),
+              Text(
+                'No matches found',
+                style: TextStyle(
+                    color: Colors.white.withAlpha(140), fontSize: 15),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverToBoxAdapter(
+      child: ResponsiveCenter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: hPad - 4),
+          child: Column(
+            children: List.generate(_allMatches.length, (index) {
+              final match = _allMatches[index];
+              final prev = index > 0 ? _allMatches[index - 1] : null;
+              final status = match.statusInContext(prev);
+
+              return MatchCard(
+                match: match,
+                matchStatus: status,
+                onPredict: () {
+                  if (status == MatchStatus.open) {
+                    Navigator.pushNamed(
+                      context,
+                      '/predict',
+                      arguments: {'match': match},
+                    ).then((_) => _loadData());
+                  }
+                },
+              )
+                  .animate()
+                  .fadeIn(delay: Duration(milliseconds: 50 * (index < 10 ? index : 10)))
+                  .slideY(begin: 0.06);
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
@@ -215,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                _showAll ? 'All Matches' : 'Upcoming Matches',
+                                _showSchedule ? 'Match Schedule' : 'Next Prediction',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodyMedium
@@ -262,16 +424,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(
                             child: _FilterChip(
-                              label: 'Upcoming',
-                              isSelected: !_showAll,
-                              onTap: () => setState(() => _showAll = false),
+                              label: 'Predict',
+                              isSelected: !_showSchedule,
+                              onTap: () => setState(() => _showSchedule = false),
                             ),
                           ),
                           Expanded(
                             child: _FilterChip(
-                              label: 'All Matches',
-                              isSelected: _showAll,
-                              onTap: () => setState(() => _showAll = true),
+                              label: 'Schedule',
+                              isSelected: _showSchedule,
+                              onTap: () => setState(() => _showSchedule = true),
                             ),
                           ),
                         ],
@@ -313,62 +475,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 )
-              else if (_displayedMatches.isEmpty)
-                SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.calendar_today,
-                            size: 56, color: Colors.white.withAlpha(50)),
-                        const SizedBox(height: 14),
-                        Text(
-                          _showAll ? 'No matches found' : 'No upcoming matches',
-                          style: TextStyle(
-                              color: Colors.white.withAlpha(140),
-                              fontSize: 15),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Pull down to refresh',
-                          style: TextStyle(
-                              color: Colors.white.withAlpha(70), fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
+              else if (_showSchedule)
+                _buildScheduleTab(hPad)
               else
-                SliverToBoxAdapter(
-                  child: ResponsiveCenter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: hPad - 4),
-                      child: Column(
-                        children: List.generate(_displayedMatches.length, (index) {
-                          final match = _displayedMatches[index];
-                          final isPast = match.startDateTime.isBefore(DateTime.now().toUtc());
-                          return Opacity(
-                            opacity: isPast && _showAll ? 0.55 : 1.0,
-                            child: MatchCard(
-                              match: match,
-                              onPredict: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/predict',
-                                  arguments: {'match': match},
-                                ).then((_) => _loadData());
-                              },
-                            ),
-                          )
-                              .animate()
-                              .fadeIn(
-                                  delay: Duration(milliseconds: 80 * (index < 8 ? index : 8)))
-                              .slideY(begin: 0.08);
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
+                _buildPredictTab(hPad),
             ],
           ),
         ),

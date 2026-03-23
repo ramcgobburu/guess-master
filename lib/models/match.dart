@@ -35,9 +35,29 @@ class Match {
     );
   }
 
+  DateTime get lockTime => startDateTime.subtract(const Duration(minutes: 30));
+
+  bool get hasStarted => DateTime.now().toUtc().isAfter(startDateTime);
+
+  bool get isLockTimePassed => DateTime.now().toUtc().isAfter(lockTime);
+
   bool get canPredict {
     final now = DateTime.now().toUtc();
-    final lockTime = startDateTime.subtract(const Duration(minutes: 31));
     return now.isBefore(lockTime) && !isLocked;
   }
+
+  MatchStatus statusInContext(Match? previousMatch) {
+    final now = DateTime.now().toUtc();
+
+    if (now.isAfter(startDateTime)) return MatchStatus.completed;
+
+    if (isLockTimePassed) return MatchStatus.locked;
+
+    final isUnlocked = previousMatch == null || previousMatch.hasStarted;
+    if (isUnlocked && canPredict) return MatchStatus.open;
+
+    return MatchStatus.upcoming;
+  }
 }
+
+enum MatchStatus { open, locked, completed, upcoming }
