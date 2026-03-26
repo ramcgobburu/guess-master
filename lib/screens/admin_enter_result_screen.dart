@@ -20,10 +20,10 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
   final _scoreController = TextEditingController();
   final _wicketsController = TextEditingController();
   final _highestScoreController = TextEditingController();
-  final _momController = TextEditingController();
 
   String? _tossWinner;
   String? _matchWinner;
+  String? _momTeam;
   bool _highestScoreTied = false;
   bool _isSaving = false;
   bool _isScoring = false;
@@ -49,10 +49,10 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
         _existingActual = existing;
         _tossWinner = existing.tossWinner;
         _matchWinner = existing.matchWinner;
+        _momTeam = existing.mom;
         _scoreController.text = existing.score.toString();
         _wicketsController.text = existing.totalWickets.toString();
         _highestScoreController.text = existing.highestScore.toString();
-        _momController.text = existing.mom;
         _highestScoreTied = existing.highestScoreTied;
       }
     } catch (_) {}
@@ -61,10 +61,10 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_tossWinner == null || _matchWinner == null) {
+    if (_tossWinner == null || _matchWinner == null || _momTeam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please select toss winner and match winner'),
+          content: const Text('Please select toss winner, match winner, and MOM team'),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -78,7 +78,7 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
         tossWinner: _tossWinner!,
         score: int.parse(_scoreController.text),
         matchWinner: _matchWinner!,
-        mom: _momController.text.trim(),
+        mom: _momTeam!,
         totalWickets: int.parse(_wicketsController.text),
         highestScore: int.parse(_highestScoreController.text),
         highestScoreTied: _highestScoreTied,
@@ -140,7 +140,6 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
     _scoreController.dispose();
     _wicketsController.dispose();
     _highestScoreController.dispose();
-    _momController.dispose();
     super.dispose();
   }
 
@@ -372,22 +371,27 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
                       ),
 
                       SizedBox(height: sectionGap),
-                      const _SectionTitle(title: 'Man of the Match'),
+                      const _SectionTitle(title: 'Man of the Match (Team)'),
                       const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _momController,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
-                          hintText: 'Player name',
-                          prefixIcon: Icon(Icons.star_outline),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          return null;
-                        },
+                      Row(
+                        children: teams.map((team) {
+                          final isSelected = _momTeam == team;
+                          final color = TeamColors.getColor(team);
+                          return Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                  right: team == team1 ? 5 : 0,
+                                  left: team == team2 ? 5 : 0),
+                              child: _TeamChip(
+                                team: team,
+                                color: color,
+                                isSelected: isSelected,
+                                onTap: () =>
+                                    setState(() => _momTeam = team),
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
 
                       const SizedBox(height: 28),

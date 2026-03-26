@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme/app_theme.dart';
+import 'services/auth_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -52,14 +53,34 @@ class GuessMasterApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/predict': (context) => const PredictScreen(),
-        '/my-predictions': (context) => const MyPredictionsScreen(),
-        '/leaderboard': (context) => const LeaderboardScreen(),
-        '/admin': (context) => const AdminScreen(),
-        '/admin-enter-result': (context) => const AdminEnterResultScreen(),
-        '/admin-groups': (context) => const AdminGroupsScreen(),
+        '/home': (context) => _AuthGuard(child: const HomeScreen()),
+        '/predict': (context) => _AuthGuard(child: const PredictScreen()),
+        '/my-predictions': (context) => _AuthGuard(child: const MyPredictionsScreen()),
+        '/leaderboard': (context) => _AuthGuard(child: const LeaderboardScreen()),
+        '/admin': (context) => _AuthGuard(child: const AdminScreen()),
+        '/admin-enter-result': (context) => _AuthGuard(child: const AdminEnterResultScreen()),
+        '/admin-groups': (context) => _AuthGuard(child: const AdminGroupsScreen()),
       },
     );
+  }
+}
+
+class _AuthGuard extends StatelessWidget {
+  final Widget child;
+  const _AuthGuard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!AuthService.isLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.accentOrange),
+        ),
+      );
+    }
+    return child;
   }
 }

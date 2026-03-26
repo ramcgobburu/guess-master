@@ -50,13 +50,12 @@ class AuthService {
     );
 
     if (authResponse.user != null) {
-      await supabase.from('profiles').upsert({
-        'id': authResponse.user!.id,
-        'name': name,
-        'email': email,
-        'group_id': groupResponse['id'],
-        'is_admin': false,
-      }, onConflict: 'id');
+      await supabase.rpc('register_user_profile', params: {
+        'p_user_id': authResponse.user!.id,
+        'p_name': name,
+        'p_email': email,
+        'p_group_code': groupCode,
+      });
     }
 
     return authResponse;

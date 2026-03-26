@@ -20,10 +20,10 @@ class _PredictScreenState extends State<PredictScreen> {
   final _scoreController = TextEditingController();
   final _wicketsController = TextEditingController();
   final _highestScoreController = TextEditingController();
-  final _momController = TextEditingController();
 
   String? _tossWinner;
   String? _matchWinner;
+  String? _momTeam;
   bool _isLoading = false;
   bool _isLoadingExisting = true;
   Match? _match;
@@ -58,18 +58,18 @@ class _PredictScreenState extends State<PredictScreen> {
     final p = _existingPrediction!;
     _tossWinner = p.tossWinner;
     _matchWinner = p.matchWinner;
+    _momTeam = p.mom;
     _scoreController.text = p.score.toString();
     _wicketsController.text = p.totalWickets.toString();
     _highestScoreController.text = p.highestScore.toString();
-    _momController.text = p.mom;
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_tossWinner == null || _matchWinner == null) {
+    if (_tossWinner == null || _matchWinner == null || _momTeam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please select toss winner and match winner'),
+          content: const Text('Please select toss winner, match winner, and MOM team'),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -86,7 +86,7 @@ class _PredictScreenState extends State<PredictScreen> {
         tossWinner: _tossWinner!,
         score: int.parse(_scoreController.text),
         matchWinner: _matchWinner!,
-        mom: _momController.text.trim(),
+        mom: _momTeam!,
         totalWickets: int.parse(_wicketsController.text),
         highestScore: int.parse(_highestScoreController.text),
       );
@@ -121,7 +121,6 @@ class _PredictScreenState extends State<PredictScreen> {
     _scoreController.dispose();
     _wicketsController.dispose();
     _highestScoreController.dispose();
-    _momController.dispose();
     super.dispose();
   }
 
@@ -304,23 +303,28 @@ class _PredictScreenState extends State<PredictScreen> {
                       ).animate().fadeIn(delay: 500.ms),
 
                       SizedBox(height: sectionGap),
-                      const _SectionTitle(title: 'Man of the Match'),
+                      const _SectionTitle(title: 'Man of the Match (Team)'),
                       const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _momController,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
-                          hintText: 'Player name',
-                          prefixIcon: Icon(Icons.star_outline),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Enter player name';
-                          }
-                          return null;
-                        },
-                        onFieldSubmitted: (_) => _submit(),
+                      Row(
+                        children: teams.map((team) {
+                          final isSelected = _momTeam == team;
+                          final color = TeamColors.getColor(team);
+                          return Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                  right: team == team1 ? 5 : 0,
+                                  left: team == team2 ? 5 : 0),
+                              child: _TeamSelectButton(
+                                team: team,
+                                color: color,
+                                isSelected: isSelected,
+                                compact: isCompact,
+                                onTap: () =>
+                                    setState(() => _momTeam = team),
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ).animate().fadeIn(delay: 600.ms),
 
                       const SizedBox(height: 28),
