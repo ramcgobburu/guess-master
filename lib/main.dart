@@ -20,9 +20,9 @@ Future<void> main() async {
 
   try {
     await Supabase.initialize(
-      url: 'https://qiigwshlzdlvddcaknyp.supabase.co',
+      url: 'https://reznesnljluqtapihbkh.supabase.co',
       anonKey:
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpaWd3c2hsemRsdmRkY2FrbnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1NDI4MjgsImV4cCI6MjA3ODExODgyOH0.0cG3OQON4pQkFRV6BLBmuU3ruOOY8UZNb156CtHpEe8',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlem5lc25samx1cXRhcGloYmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0ODA4NzQsImV4cCI6MjA5MDA1Njg3NH0.Ja3kTTvhk4E3S2hsA0hE51msvJD-D65BIpqyTKVYyF4',
     );
   } catch (e) {
     debugPrint('Supabase init failed: $e');
