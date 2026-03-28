@@ -110,6 +110,17 @@ class ApiService {
     return (response as List).length;
   }
 
+  // --- Match entries (group-filtered, only after match starts) ---
+
+  static Future<List<Map<String, dynamic>>> getMatchEntries(
+      String matchId) async {
+    final response = await supabase.rpc(
+      'get_match_entries',
+      params: {'p_match_id': matchId},
+    );
+    return List<Map<String, dynamic>>.from(response ?? []);
+  }
+
   // --- Group methods ---
 
   static Future<List<Group>> getAllGroups() async {

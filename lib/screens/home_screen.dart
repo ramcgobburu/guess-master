@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../widgets/match_card.dart';
+import '../widgets/app_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Match> _allMatches = [];
   bool _isLoading = true;
   String? _error;
-  bool _showSchedule = false;
+  int _tabIndex = 0; // 0=Predict, 1=Schedule, 2=Entries
 
   String get _userName => AuthService.userName;
   String get _userEmail => AuthService.userEmail;
@@ -217,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 18),
               TextButton(
-                onPressed: () => setState(() => _showSchedule = true),
+                onPressed: () => setState(() => _tabIndex = 1),
                 child: const Text('View Schedule',
                     style: TextStyle(color: AppTheme.accentOrange)),
               ),
@@ -343,11 +344,68 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildEntriesTab(double hPad) {
+    final startedMatches =
+        _allMatches.where((m) => m.hasStarted).toList().reversed.toList();
+
+    if (startedMatches.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.people_outline,
+                  size: 56, color: Colors.white.withAlpha(50)),
+              const SizedBox(height: 14),
+              Text(
+                'No matches have started yet',
+                style: TextStyle(
+                    color: Colors.white.withAlpha(140), fontSize: 15),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Entries become visible once a match begins',
+                style: TextStyle(
+                    color: Colors.white.withAlpha(70), fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverToBoxAdapter(
+      child: ResponsiveCenter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: hPad - 4),
+          child: Column(
+            children: List.generate(startedMatches.length, (index) {
+              final match = startedMatches[index];
+              return _EntriesMatchCard(
+                match: match,
+                onTap: () {
+                  Navigator.pushNamed(context, '/match-entries',
+                      arguments: {'match': match});
+                },
+              )
+                  .animate()
+                  .fadeIn(
+                      delay: Duration(
+                          milliseconds: 50 * (index < 10 ? index : 10)))
+                  .slideY(begin: 0.06);
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadData,
@@ -380,7 +438,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               Row(
                                 children: [
                                   Text(
-                                    _showSchedule ? 'Match Schedule' : 'Next Prediction',
+                                    _tabIndex == 0
+                                        ? 'Next Prediction'
+                                        : _tabIndex == 1
+                                            ? 'Match Schedule'
+                                            : 'Group Entries',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -410,23 +472,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.accentOrange, AppTheme.deepPurple],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.accentOrange.withAlpha(50),
-                                blurRadius: 12,
+                        GestureDetector(
+                          onTap: () => Scaffold.of(context).openDrawer(),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [AppTheme.accentOrange, AppTheme.deepPurple],
                               ),
-                            ],
-                          ),
-                          child: const Padding(
-                            padding: EdgeInsets.all(10),
-                            child: Icon(Icons.sports_cricket,
-                                color: Colors.white, size: 22),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.accentOrange.withAlpha(50),
+                                  blurRadius: 12,
+                                ),
+                              ],
+                            ),
+                            child: const Padding(
+                              padding: EdgeInsets.all(10),
+                              child: Icon(Icons.menu,
+                                  color: Colors.white, size: 22),
+                            ),
                           ),
                         ),
                       ],
@@ -449,15 +514,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: _FilterChip(
                               label: 'Predict',
-                              isSelected: !_showSchedule,
-                              onTap: () => setState(() => _showSchedule = false),
+                              isSelected: _tabIndex == 0,
+                              onTap: () => setState(() => _tabIndex = 0),
                             ),
                           ),
                           Expanded(
                             child: _FilterChip(
                               label: 'Schedule',
-                              isSelected: _showSchedule,
-                              onTap: () => setState(() => _showSchedule = true),
+                              isSelected: _tabIndex == 1,
+                              onTap: () => setState(() => _tabIndex = 1),
+                            ),
+                          ),
+                          Expanded(
+                            child: _FilterChip(
+                              label: 'Entries',
+                              isSelected: _tabIndex == 2,
+                              onTap: () => setState(() => _tabIndex = 2),
                             ),
                           ),
                         ],
@@ -499,8 +571,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 )
-              else if (_showSchedule)
+              else if (_tabIndex == 1)
                 _buildScheduleTab(hPad)
+              else if (_tabIndex == 2)
+                _buildEntriesTab(hPad)
               else
                 _buildPredictTab(hPad),
             ],
@@ -532,6 +606,75 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Profile',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EntriesMatchCard extends StatelessWidget {
+  final Match match;
+  final VoidCallback onTap;
+
+  const _EntriesMatchCard({required this.match, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('MMM d, yyyy').format(match.startDateTime.toLocal());
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppTheme.cardDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withAlpha(10)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.accentOrange.withAlpha(25),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '#${match.matchId}',
+                style: const TextStyle(
+                  color: AppTheme.accentOrange,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${match.team1} vs ${match.team2}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    dateStr,
+                    style: TextStyle(
+                      color: Colors.white.withAlpha(80),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right,
+                color: Colors.white38, size: 22),
+          ],
+        ),
       ),
     );
   }

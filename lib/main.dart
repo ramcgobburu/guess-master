@@ -14,6 +14,8 @@ import 'screens/admin_screen.dart';
 import 'screens/admin_enter_result_screen.dart';
 import 'screens/admin_groups_screen.dart';
 import 'screens/forgot_password_screen.dart';
+import 'screens/match_entries_screen.dart';
+import 'screens/points_rubric_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +62,8 @@ class GuessMasterApp extends StatelessWidget {
         '/admin': (context) => _AuthGuard(child: const AdminScreen()),
         '/admin-enter-result': (context) => _AuthGuard(child: const AdminEnterResultScreen()),
         '/admin-groups': (context) => _AuthGuard(child: const AdminGroupsScreen()),
+        '/match-entries': (context) => _AuthGuard(child: const MatchEntriesScreen()),
+        '/points-rubric': (context) => _AuthGuard(child: const PointsRubricScreen()),
       },
     );
   }
