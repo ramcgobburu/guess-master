@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/group.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
@@ -15,13 +16,30 @@ class LeaderboardScreen extends StatefulWidget {
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   List<LeaderboardEntry> _entries = [];
+  List<Group> _groups = [];
+  String? _selectedGroupId;
+  String _selectedGroupName = '';
   bool _isLoading = true;
   String? _error;
+
+  bool get _isAdmin => AuthService.isAdmin;
 
   @override
   void initState() {
     super.initState();
-    _loadLeaderboard();
+    _selectedGroupId = AuthService.groupId;
+    _selectedGroupName = AuthService.groupName;
+    _init();
+  }
+
+  Future<void> _init() async {
+    if (_isAdmin) {
+      try {
+        final groups = await ApiService.getAllGroups();
+        if (mounted) setState(() => _groups = groups);
+      } catch (_) {}
+    }
+    await _loadLeaderboard();
   }
 
   Future<void> _loadLeaderboard() async {
@@ -30,7 +48,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       _error = null;
     });
     try {
-      final entries = await ApiService.getLeaderboard();
+      final entries =
+          await ApiService.getLeaderboard(groupId: _selectedGroupId);
       entries.sort((a, b) => b.totalPoints.compareTo(a.totalPoints));
       if (mounted) {
         setState(() {
@@ -48,107 +67,191 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     }
   }
 
+  void _onGroupChanged(Group group) {
+    setState(() {
+      _selectedGroupId = group.id;
+      _selectedGroupName = group.name;
+    });
+    _loadLeaderboard();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hPad = Responsive.horizontalPadding(context);
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(AuthService.groupName.isNotEmpty
-            ? '${AuthService.groupName} Leaderboard'
+        title: Text(_selectedGroupName.isNotEmpty
+            ? '$_selectedGroupName Leaderboard'
             : 'Leaderboard'),
       ),
       body: RefreshIndicator(
         onRefresh: _loadLeaderboard,
         color: AppTheme.accentOrange,
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppTheme.accentOrange))
-            : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.error_outline,
-                              size: 48, color: Colors.red.shade400),
-                          const SizedBox(height: 12),
-                          Text(_error!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.red.shade400)),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadLeaderboard,
-                            child: const Text('Retry'),
-                          ),
-                        ],
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            if (_isAdmin && _groups.length > 1)
+              SliverToBoxAdapter(
+                child: ResponsiveCenter(
+                  child: Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: hPad, vertical: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(10),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    ),
-                  )
-                : _entries.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.leaderboard_outlined,
-                                size: 56,
-                                color: Colors.white.withAlpha(50)),
-                            const SizedBox(height: 14),
-                            Text(
-                              'No scores yet',
-                              style: TextStyle(
-                                  color: Colors.white.withAlpha(140),
-                                  fontSize: 15),
-                            ),
-                          ],
-                        ),
-                      )
-                    : CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          if (_entries.length >= 3)
-                            SliverToBoxAdapter(
-                              child: ResponsiveCenter(
-                                child: _TopThree(entries: _entries)
-                                    .animate()
-                                    .fadeIn(duration: 500.ms),
-                              ),
-                            ),
-                          SliverToBoxAdapter(
-                            child: ResponsiveCenter(
-                              padding: EdgeInsets.symmetric(
-                                horizontal:
-                                    Responsive.horizontalPadding(context),
-                                vertical: 8,
-                              ),
-                              child: Column(
-                                children: List.generate(
-                                  _entries.length >= 3
-                                      ? _entries.length - 3
-                                      : _entries.length,
-                                  (index) {
-                                    final startIdx =
-                                        _entries.length >= 3 ? 3 : 0;
-                                    final actualIdx = startIdx + index;
-                                    return _LeaderboardRow(
-                                      rank: actualIdx + 1,
-                                      entry: _entries[actualIdx],
-                                    )
-                                        .animate()
-                                        .fadeIn(
-                                            delay: Duration(
-                                                milliseconds: 80 * index))
-                                        .slideX(begin: 0.04);
-                                  },
+                      padding: const EdgeInsets.all(3),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _groups.map((group) {
+                            final isSelected =
+                                group.id == _selectedGroupId;
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              child: GestureDetector(
+                                onTap: () => _onGroupChanged(group),
+                                child: AnimatedContainer(
+                                  duration:
+                                      const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppTheme.accentOrange
+                                            .withAlpha(40)
+                                        : Colors.transparent,
+                                    borderRadius:
+                                        BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppTheme.accentOrange
+                                              .withAlpha(100)
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    group.name,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? AppTheme.accentOrange
+                                          : Colors.white54,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ],
+                            );
+                          }).toList(),
+                        ),
                       ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_isLoading)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(
+                      color: AppTheme.accentOrange),
+                ),
+              )
+            else if (_error != null)
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.error_outline,
+                            size: 48, color: Colors.red.shade400),
+                        const SizedBox(height: 12),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style:
+                                TextStyle(color: Colors.red.shade400)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadLeaderboard,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else if (_entries.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.leaderboard_outlined,
+                          size: 56,
+                          color: Colors.white.withAlpha(50)),
+                      const SizedBox(height: 14),
+                      Text(
+                        'No scores yet',
+                        style: TextStyle(
+                            color: Colors.white.withAlpha(140),
+                            fontSize: 15),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              if (_entries.length >= 3)
+                SliverToBoxAdapter(
+                  child: ResponsiveCenter(
+                    child: _TopThree(entries: _entries)
+                        .animate()
+                        .fadeIn(duration: 500.ms),
+                  ),
+                ),
+              SliverToBoxAdapter(
+                child: ResponsiveCenter(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: hPad,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    children: List.generate(
+                      _entries.length >= 3
+                          ? _entries.length - 3
+                          : _entries.length,
+                      (index) {
+                        final startIdx =
+                            _entries.length >= 3 ? 3 : 0;
+                        final actualIdx = startIdx + index;
+                        return _LeaderboardRow(
+                          rank: actualIdx + 1,
+                          entry: _entries[actualIdx],
+                        )
+                            .animate()
+                            .fadeIn(
+                                delay: Duration(
+                                    milliseconds: 80 * index))
+                            .slideX(begin: 0.04);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
