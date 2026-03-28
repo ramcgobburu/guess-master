@@ -112,7 +112,7 @@ class _MatchEntriesScreenState extends State<MatchEntriesScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Entries are visible after the match starts',
+                              'No one has made predictions for this match yet',
                               style: TextStyle(
                                   color: Colors.white.withAlpha(70),
                                   fontSize: 13),

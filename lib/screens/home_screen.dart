@@ -345,10 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEntriesTab(double hPad) {
-    final startedMatches =
-        _allMatches.where((m) => m.hasStarted).toList().reversed.toList();
-
-    if (startedMatches.isEmpty) {
+    if (_allMatches.isEmpty) {
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -358,15 +355,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   size: 56, color: Colors.white.withAlpha(50)),
               const SizedBox(height: 14),
               Text(
-                'No matches have started yet',
+                'No matches found',
                 style: TextStyle(
                     color: Colors.white.withAlpha(140), fontSize: 15),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Entries become visible once a match begins',
-                style: TextStyle(
-                    color: Colors.white.withAlpha(70), fontSize: 13),
               ),
             ],
           ),
@@ -379,8 +370,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: hPad - 4),
           child: Column(
-            children: List.generate(startedMatches.length, (index) {
-              final match = startedMatches[index];
+            children: List.generate(_allMatches.length, (index) {
+              final match = _allMatches[index];
               return _EntriesMatchCard(
                 match: match,
                 onTap: () {
