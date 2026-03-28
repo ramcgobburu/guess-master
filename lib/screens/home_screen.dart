@@ -17,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
   List<Match> _allMatches = [];
   bool _isLoading = true;
@@ -405,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final hPad = Responsive.horizontalPadding(context);
 
     return Scaffold(
+      key: _scaffoldKey,
       drawer: const AppDrawer(),
       body: SafeArea(
         child: RefreshIndicator(
@@ -473,7 +475,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => Scaffold.of(context).openDrawer(),
+                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
                           child: Container(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
