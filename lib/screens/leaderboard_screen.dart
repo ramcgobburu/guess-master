@@ -14,22 +14,33 @@ class LeaderboardScreen extends StatefulWidget {
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
-class _LeaderboardScreenState extends State<LeaderboardScreen> {
+class _LeaderboardScreenState extends State<LeaderboardScreen>
+    with SingleTickerProviderStateMixin {
   List<LeaderboardEntry> _entries = [];
+  List<Map<String, dynamic>> _details = [];
   List<Group> _groups = [];
   String? _selectedGroupId;
   String _selectedGroupName = '';
   bool _isLoading = true;
+  bool _isDetailsLoading = true;
   String? _error;
+  late TabController _tabController;
 
   bool get _isAdmin => AuthService.isAdmin;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _selectedGroupId = AuthService.groupId;
     _selectedGroupName = AuthService.groupName;
     _init();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -39,7 +50,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         if (mounted) setState(() => _groups = groups);
       } catch (_) {}
     }
-    await _loadLeaderboard();
+    await Future.wait([_loadLeaderboard(), _loadDetails()]);
   }
 
   Future<void> _loadLeaderboard() async {
@@ -67,18 +78,37 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     }
   }
 
+  Future<void> _loadDetails() async {
+    setState(() => _isDetailsLoading = true);
+    try {
+      final details =
+          await ApiService.getLeaderboardDetails(groupId: _selectedGroupId);
+      if (mounted) {
+        setState(() {
+          _details = details;
+          _isDetailsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isDetailsLoading = false);
+    }
+  }
+
   void _onGroupChanged(Group group) {
     setState(() {
       _selectedGroupId = group.id;
       _selectedGroupName = group.name;
     });
     _loadLeaderboard();
+    _loadDetails();
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([_loadLeaderboard(), _loadDetails()]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final hPad = Responsive.horizontalPadding(context);
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -88,87 +118,99 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         title: Text(_selectedGroupName.isNotEmpty
             ? '$_selectedGroupName Leaderboard'
             : 'Leaderboard'),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: AppTheme.accentOrange,
+          labelColor: AppTheme.accentOrange,
+          unselectedLabelColor: Colors.white54,
+          labelStyle:
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          tabs: const [
+            Tab(text: 'Standings'),
+            Tab(text: 'Points Split'),
+          ],
+        ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadLeaderboard,
-        color: AppTheme.accentOrange,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            if (_isAdmin && _groups.length > 1)
-              SliverToBoxAdapter(
-                child: ResponsiveCenter(
-                  child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: hPad, vertical: 8),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(10),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.all(3),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: _groups.map((group) {
-                            final isSelected =
-                                group.id == _selectedGroupId;
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 2),
-                              child: GestureDetector(
-                                onTap: () => _onGroupChanged(group),
-                                child: AnimatedContainer(
-                                  duration:
-                                      const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppTheme.accentOrange
-                                            .withAlpha(40)
-                                        : Colors.transparent,
-                                    borderRadius:
-                                        BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? AppTheme.accentOrange
-                                              .withAlpha(100)
-                                          : Colors.transparent,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    group.name,
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? AppTheme.accentOrange
-                                          : Colors.white54,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
+      body: Column(
+        children: [
+          if (_isAdmin && _groups.length > 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(3),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _groups.map((group) {
+                      final isSelected = group.id == _selectedGroupId;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: GestureDetector(
+                          onTap: () => _onGroupChanged(group),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppTheme.accentOrange.withAlpha(40)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppTheme.accentOrange.withAlpha(100)
+                                    : Colors.transparent,
                               ),
-                            );
-                          }).toList(),
+                            ),
+                            child: Text(
+                              group.name,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? AppTheme.accentOrange
+                                    : Colors.white54,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
-            if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(
-                  child: CircularProgressIndicator(
-                      color: AppTheme.accentOrange),
-                ),
-              )
-            else if (_error != null)
-              SliverFillRemaining(
-                child: Center(
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildStandingsTab(),
+                _buildPointsSplitTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStandingsTab() {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      color: AppTheme.accentOrange,
+      child: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.accentOrange))
+          : _error != null
+              ? Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Column(
@@ -179,8 +221,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         const SizedBox(height: 12),
                         Text(_error!,
                             textAlign: TextAlign.center,
-                            style:
-                                TextStyle(color: Colors.red.shade400)),
+                            style: TextStyle(color: Colors.red.shade400)),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _loadLeaderboard,
@@ -189,70 +230,186 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       ],
                     ),
                   ),
-                ),
-              )
-            else if (_entries.isEmpty)
-              SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.leaderboard_outlined,
-                          size: 56,
-                          color: Colors.white.withAlpha(50)),
-                      const SizedBox(height: 14),
-                      Text(
-                        'No scores yet',
-                        style: TextStyle(
-                            color: Colors.white.withAlpha(140),
-                            fontSize: 15),
+                )
+              : _entries.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.leaderboard_outlined,
+                              size: 56, color: Colors.white.withAlpha(50)),
+                          const SizedBox(height: 14),
+                          Text(
+                            'No scores yet',
+                            style: TextStyle(
+                                color: Colors.white.withAlpha(140),
+                                fontSize: 15),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              )
-            else ...[
-              if (_entries.length >= 3)
-                SliverToBoxAdapter(
-                  child: ResponsiveCenter(
-                    child: _TopThree(entries: _entries)
-                        .animate()
-                        .fadeIn(duration: 500.ms),
-                  ),
-                ),
-              SliverToBoxAdapter(
-                child: ResponsiveCenter(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: hPad,
-                    vertical: 8,
-                  ),
-                  child: Column(
-                    children: List.generate(
-                      _entries.length >= 3
-                          ? _entries.length - 3
-                          : _entries.length,
-                      (index) {
-                        final startIdx =
-                            _entries.length >= 3 ? 3 : 0;
-                        final actualIdx = startIdx + index;
-                        return _LeaderboardRow(
-                          rank: actualIdx + 1,
-                          entry: _entries[actualIdx],
-                        )
-                            .animate()
-                            .fadeIn(
-                                delay: Duration(
-                                    milliseconds: 80 * index))
-                            .slideX(begin: 0.04);
-                      },
+                    )
+                  : CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        if (_entries.length >= 3)
+                          SliverToBoxAdapter(
+                            child: ResponsiveCenter(
+                              child: _TopThree(entries: _entries)
+                                  .animate()
+                                  .fadeIn(duration: 500.ms),
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: ResponsiveCenter(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: hPad,
+                              vertical: 8,
+                            ),
+                            child: Column(
+                              children: List.generate(
+                                _entries.length >= 3
+                                    ? _entries.length - 3
+                                    : _entries.length,
+                                (index) {
+                                  final startIdx =
+                                      _entries.length >= 3 ? 3 : 0;
+                                  final actualIdx = startIdx + index;
+                                  return _LeaderboardRow(
+                                    rank: actualIdx + 1,
+                                    entry: _entries[actualIdx],
+                                  )
+                                      .animate()
+                                      .fadeIn(
+                                          delay: Duration(
+                                              milliseconds: 80 * index))
+                                      .slideX(begin: 0.04);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-              ),
-            ],
-          ],
+    );
+  }
+
+  Widget _buildPointsSplitTab() {
+    if (_isDetailsLoading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppTheme.accentOrange));
+    }
+
+    if (_details.isEmpty) {
+      return Center(
+        child: Text(
+          'No points data yet',
+          style: TextStyle(color: Colors.white.withAlpha(140), fontSize: 15),
         ),
-      ),
+      );
+    }
+
+    final matchIds = <String>{};
+    final userMap = <String, Map<String, int>>{};
+    final userTotals = <String, int>{};
+
+    for (final row in _details) {
+      final name = row['user_name'] as String? ?? '';
+      final matchId = row['match_id'] as String? ?? '';
+      final pts = (row['points'] as num?)?.toInt() ?? 0;
+
+      matchIds.add(matchId);
+      userMap.putIfAbsent(name, () => {});
+      userMap[name]![matchId] = pts;
+      userTotals[name] = (userTotals[name] ?? 0) + pts;
+    }
+
+    final sortedMatchIds = matchIds.toList()
+      ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+    final sortedUsers = userTotals.keys.toList()
+      ..sort((a, b) => (userTotals[b] ?? 0).compareTo(userTotals[a] ?? 0));
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor:
+              WidgetStateProperty.all(AppTheme.deepPurple.withAlpha(40)),
+          dataRowColor: WidgetStateProperty.all(AppTheme.cardDark),
+          border: TableBorder.all(
+            color: Colors.white.withAlpha(15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          columnSpacing: 14,
+          horizontalMargin: 12,
+          headingRowHeight: 44,
+          dataRowMinHeight: 38,
+          dataRowMaxHeight: 44,
+          columns: [
+            const DataColumn(
+              label: Text('Name',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: AppTheme.accentOrange)),
+            ),
+            ...sortedMatchIds.map((id) => DataColumn(
+                  label: Text('M$id',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          color: AppTheme.accentOrange)),
+                )),
+            const DataColumn(
+              label: Text('Total',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: AppTheme.gold)),
+            ),
+          ],
+          rows: sortedUsers.asMap().entries.map((e) {
+            final i = e.key;
+            final name = e.value;
+            final total = userTotals[name] ?? 0;
+
+            return DataRow(
+              color: WidgetStateProperty.all(
+                i.isEven ? AppTheme.cardDark : AppTheme.surfaceDark,
+              ),
+              cells: [
+                DataCell(SizedBox(
+                  width: 100,
+                  child: Text(name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 12),
+                      overflow: TextOverflow.ellipsis),
+                )),
+                ...sortedMatchIds.map((mid) {
+                  final pts = userMap[name]?[mid] ?? 0;
+                  return DataCell(Text(
+                    pts > 0 ? '$pts' : '-',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: pts > 0 ? Colors.white : Colors.white30,
+                      fontWeight:
+                          pts > 0 ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ));
+                }),
+                DataCell(Text(
+                  '$total',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: total > 0 ? AppTheme.gold : Colors.white54,
+                  ),
+                )),
+              ],
+            );
+          }).toList(),
+        ),
+      ).animate().fadeIn(),
     );
   }
 }

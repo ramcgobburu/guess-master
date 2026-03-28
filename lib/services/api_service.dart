@@ -110,7 +110,19 @@ class ApiService {
     return (response as List).length;
   }
 
-  // --- Match entries (group-filtered, only after match starts) ---
+  // --- Leaderboard details (per-match points split) ---
+
+  static Future<List<Map<String, dynamic>>> getLeaderboardDetails(
+      {String? groupId}) async {
+    final gid = groupId ?? AuthService.groupId;
+    final response = await supabase.rpc(
+      'get_leaderboard_details',
+      params: gid != null ? {'p_group_id': gid} : {},
+    );
+    return List<Map<String, dynamic>>.from(response ?? []);
+  }
+
+  // --- Match entries (group-filtered, only after lock time) ---
 
   static Future<List<Map<String, dynamic>>> getMatchEntries(
       String matchId) async {

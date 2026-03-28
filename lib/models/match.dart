@@ -35,7 +35,7 @@ class Match {
     );
   }
 
-  DateTime get lockTime => startDateTime.subtract(const Duration(minutes: 30));
+  DateTime get lockTime => startDateTime.subtract(const Duration(minutes: 31));
 
   bool get hasStarted => DateTime.now().toUtc().isAfter(startDateTime);
 

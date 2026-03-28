@@ -346,10 +346,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEntriesTab(double hPad) {
-    final startedMatches =
-        _allMatches.where((m) => m.hasStarted).toList().reversed.toList();
+    final lockedMatches =
+        _allMatches.where((m) => m.isLockTimePassed).toList().reversed.toList();
 
-    if (startedMatches.isEmpty) {
+    if (lockedMatches.isEmpty) {
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -359,13 +359,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   size: 56, color: Colors.white.withAlpha(50)),
               const SizedBox(height: 14),
               Text(
-                'No matches have started yet',
+                'No match entries available yet',
                 style: TextStyle(
                     color: Colors.white.withAlpha(140), fontSize: 15),
               ),
               const SizedBox(height: 6),
               Text(
-                'Entries become visible once a match begins',
+                'Entries become visible once predictions lock',
                 style: TextStyle(
                     color: Colors.white.withAlpha(70), fontSize: 13),
               ),
@@ -380,8 +380,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: hPad - 4),
           child: Column(
-            children: List.generate(startedMatches.length, (index) {
-              final match = startedMatches[index];
+            children: List.generate(lockedMatches.length, (index) {
+              final match = lockedMatches[index];
               return _EntriesMatchCard(
                 match: match,
                 onTap: () {

@@ -37,7 +37,7 @@ class PointsRubricScreen extends StatelessWidget {
                 title: 'Match Winner',
                 color: AppTheme.gold,
                 rows: const [
-                  _RubricRow('Correct prediction', '30 pts'),
+                  _RubricRow('Correct prediction', '50 pts'),
                 ],
               ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.05),
               _RubricSection(
@@ -108,7 +108,7 @@ class PointsRubricScreen extends StatelessWidget {
                         color: AppTheme.accentOrange, size: 22),
                     const SizedBox(height: 8),
                     Text(
-                      'Maximum possible points per match: 265',
+                      'Maximum possible points per match: 285',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppTheme.accentOrange.withAlpha(200),
@@ -118,7 +118,7 @@ class PointsRubricScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '(20 + 30 + 50 + 100 + 40 + 50 + 25 if HS tied & all correct)',
+                      '(20 + 50 + 50 + 100 + 40 + 50 + 25 if HS tied & all correct)',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withAlpha(80),
