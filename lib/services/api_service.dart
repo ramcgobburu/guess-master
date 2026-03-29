@@ -122,6 +122,21 @@ class ApiService {
     return List<Map<String, dynamic>>.from(response ?? []);
   }
 
+  // --- Match breakdown (per-category points for a specific match) ---
+
+  static Future<List<Map<String, dynamic>>> getMatchBreakdown(
+      String matchId, {String? groupId}) async {
+    final gid = groupId ?? AuthService.groupId;
+    final response = await supabase.rpc(
+      'get_match_breakdown',
+      params: {
+        'p_match_id': matchId,
+        if (gid != null) 'p_group_id': gid,
+      },
+    );
+    return List<Map<String, dynamic>>.from(response ?? []);
+  }
+
   // --- Match entries (group-filtered, only after lock time) ---
 
   static Future<List<Map<String, dynamic>>> getMatchEntries(

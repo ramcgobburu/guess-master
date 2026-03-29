@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/match.dart';
 import '../models/group.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -18,11 +19,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   List<LeaderboardEntry> _entries = [];
   List<Map<String, dynamic>> _details = [];
+  List<Map<String, dynamic>> _breakdown = [];
   List<Group> _groups = [];
+  List<Match> _allMatches = [];
   String? _selectedGroupId;
   String _selectedGroupName = '';
+  String? _breakdownMatchId;
   bool _isLoading = true;
   bool _isDetailsLoading = true;
+  bool _isBreakdownLoading = false;
   String? _error;
   late TabController _tabController;
 
@@ -31,7 +36,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _selectedGroupId = AuthService.groupId;
     _selectedGroupName = AuthService.groupName;
     _init();
@@ -50,6 +55,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         if (mounted) setState(() => _groups = groups);
       } catch (_) {}
     }
+    try {
+      final matches = await ApiService.getAllMatches();
+      if (mounted) setState(() => _allMatches = matches);
+    } catch (_) {}
     await Future.wait([_loadLeaderboard(), _loadDetails()]);
   }
 
@@ -94,6 +103,25 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     }
   }
 
+  Future<void> _loadBreakdown() async {
+    if (_breakdownMatchId == null) return;
+    setState(() => _isBreakdownLoading = true);
+    try {
+      final data = await ApiService.getMatchBreakdown(
+        _breakdownMatchId!,
+        groupId: _selectedGroupId,
+      );
+      if (mounted) {
+        setState(() {
+          _breakdown = data;
+          _isBreakdownLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isBreakdownLoading = false);
+    }
+  }
+
   void _onGroupChanged(Group group) {
     setState(() {
       _selectedGroupId = group.id;
@@ -101,10 +129,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     });
     _loadLeaderboard();
     _loadDetails();
+    if (_breakdownMatchId != null) _loadBreakdown();
   }
 
   Future<void> _refresh() async {
     await Future.wait([_loadLeaderboard(), _loadDetails()]);
+    if (_breakdownMatchId != null) _loadBreakdown();
   }
 
   @override
@@ -128,6 +158,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           tabs: const [
             Tab(text: 'Standings'),
             Tab(text: 'Points Split'),
+            Tab(text: 'Match Detail'),
           ],
         ),
       ),
@@ -192,6 +223,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               children: [
                 _buildStandingsTab(),
                 _buildPointsSplitTab(),
+                _buildMatchBreakdownTab(),
               ],
             ),
           ),
@@ -411,6 +443,200 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ),
       ).animate().fadeIn(),
     );
+  }
+
+  Widget _buildMatchBreakdownTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.cardDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _breakdownMatchId,
+                hint: const Text('Select a match',
+                    style: TextStyle(color: Colors.white54, fontSize: 14)),
+                dropdownColor: AppTheme.cardDark,
+                isExpanded: true,
+                icon: const Icon(Icons.arrow_drop_down,
+                    color: AppTheme.accentOrange),
+                items: _allMatches.map((m) {
+                  return DropdownMenuItem<String>(
+                    value: m.matchId,
+                    child: Text(
+                      'M${m.matchId}: ${m.team1} vs ${m.team2}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() => _breakdownMatchId = val);
+                  _loadBreakdown();
+                },
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _breakdownMatchId == null
+              ? Center(
+                  child: Text(
+                    'Select a match to view points breakdown',
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(100), fontSize: 14),
+                  ),
+                )
+              : _isBreakdownLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppTheme.accentOrange))
+                  : _breakdown.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No scored predictions for this match',
+                            style: TextStyle(
+                                color: Colors.white.withAlpha(100),
+                                fontSize: 14),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              headingRowColor: WidgetStateProperty.all(
+                                  AppTheme.deepPurple.withAlpha(40)),
+                              dataRowColor: WidgetStateProperty.all(
+                                  AppTheme.cardDark),
+                              border: TableBorder.all(
+                                color: Colors.white.withAlpha(15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              columnSpacing: 12,
+                              horizontalMargin: 10,
+                              headingRowHeight: 44,
+                              dataRowMinHeight: 38,
+                              dataRowMaxHeight: 44,
+                              columns: const [
+                                DataColumn(
+                                    label: Text('Name',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('Toss',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('Winner',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('Score',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('HS',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('Wkts',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('MOM',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('Bonus',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.accentOrange))),
+                                DataColumn(
+                                    label: Text('Total',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                            color: AppTheme.gold))),
+                              ],
+                              rows: _breakdown.asMap().entries.map((e) {
+                                final i = e.key;
+                                final row = e.value;
+                                return DataRow(
+                                  color: WidgetStateProperty.all(
+                                    i.isEven
+                                        ? AppTheme.cardDark
+                                        : AppTheme.surfaceDark,
+                                  ),
+                                  cells: [
+                                    DataCell(SizedBox(
+                                      width: 90,
+                                      child: Text(
+                                        row['user_name'] ?? '-',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 11),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    )),
+                                    _ptsCell(row['toss_pts']),
+                                    _ptsCell(row['winner_pts']),
+                                    _ptsCell(row['score_pts']),
+                                    _ptsCell(row['hs_pts']),
+                                    _ptsCell(row['wickets_pts']),
+                                    _ptsCell(row['mom_pts']),
+                                    _ptsCell(row['bonus_pts']),
+                                    DataCell(Text(
+                                      '${row['total_pts'] ?? 0}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color: (row['total_pts'] ?? 0) > 0
+                                            ? AppTheme.gold
+                                            : Colors.white54,
+                                      ),
+                                    )),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ).animate().fadeIn(),
+                        ),
+        ),
+      ],
+    );
+  }
+
+  DataCell _ptsCell(dynamic value) {
+    final pts = (value as num?)?.toInt() ?? 0;
+    return DataCell(Text(
+      pts > 0 ? '$pts' : '-',
+      style: TextStyle(
+        fontSize: 12,
+        color: pts > 0 ? Colors.greenAccent : Colors.white30,
+        fontWeight: pts > 0 ? FontWeight.w600 : FontWeight.normal,
+      ),
+    ));
   }
 }
 
