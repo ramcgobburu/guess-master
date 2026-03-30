@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:intl/intl.dart';
 import '../models/match.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -23,6 +22,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _error;
   int _tabIndex = 0; // 0=Predict, 1=Schedule, 2=Entries
+  List<Map<String, dynamic>> _currentEntries = [];
+  bool _isEntriesLoading = false;
+  Match? _currentEntriesMatch;
 
   String get _userName => AuthService.userName;
   String get _userEmail => AuthService.userEmail;
@@ -46,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _allMatches = matches;
           _isLoading = false;
         });
+        _loadCurrentEntries();
       }
     } catch (e) {
       if (mounted) {
@@ -66,6 +69,32 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     return null;
+  }
+
+  Match? get _latestLockedMatch {
+    final locked = _allMatches.where((m) => m.isLockTimePassed).toList();
+    if (locked.isEmpty) return null;
+    return locked.last;
+  }
+
+  Future<void> _loadCurrentEntries() async {
+    final match = _latestLockedMatch;
+    if (match == null) return;
+    setState(() {
+      _isEntriesLoading = true;
+      _currentEntriesMatch = match;
+    });
+    try {
+      final entries = await ApiService.getMatchEntries(match.matchId);
+      if (mounted) {
+        setState(() {
+          _currentEntries = entries;
+          _isEntriesLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isEntriesLoading = false);
+    }
   }
 
   Match? _getPreviousMatch(Match match) {
@@ -346,10 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEntriesTab(double hPad) {
-    final lockedMatches =
-        _allMatches.where((m) => m.isLockTimePassed).toList().reversed.toList();
-
-    if (lockedMatches.isEmpty) {
+    if (_currentEntriesMatch == null) {
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -375,30 +401,130 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    if (_isEntriesLoading) {
+      return const SliverFillRemaining(
+        child: Center(
+          child: CircularProgressIndicator(color: AppTheme.accentOrange),
+        ),
+      );
+    }
+
+    final match = _currentEntriesMatch!;
+    const headers = ['Name', 'Toss', 'Winner', 'Score', 'Wkts', 'HS', 'MOM', 'Pts'];
+
     return SliverToBoxAdapter(
       child: ResponsiveCenter(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: hPad - 4),
           child: Column(
-            children: List.generate(lockedMatches.length, (index) {
-              final match = lockedMatches[index];
-              return _EntriesMatchCard(
-                match: match,
-                onTap: () {
-                  Navigator.pushNamed(context, '/match-entries',
-                      arguments: {'match': match});
-                },
-              )
-                  .animate()
-                  .fadeIn(
-                      delay: Duration(
-                          milliseconds: 50 * (index < 10 ? index : 10)))
-                  .slideY(begin: 0.06);
-            }),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.deepPurple.withAlpha(30),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.deepPurple.withAlpha(60)),
+                ),
+                child: Text(
+                  'Match ${match.matchId}: ${match.team1} vs ${match.team2}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppTheme.accentOrange,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ).animate().fadeIn(),
+              const SizedBox(height: 10),
+              if (_currentEntries.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    'No predictions for this match yet',
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(100), fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor:
+                        WidgetStateProperty.all(AppTheme.deepPurple.withAlpha(40)),
+                    dataRowColor: WidgetStateProperty.all(AppTheme.cardDark),
+                    border: TableBorder.all(
+                      color: Colors.white.withAlpha(15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    columnSpacing: 16,
+                    horizontalMargin: 12,
+                    headingRowHeight: 44,
+                    dataRowMinHeight: 40,
+                    dataRowMaxHeight: 48,
+                    columns: headers
+                        .map((h) => DataColumn(
+                              label: Text(h,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: AppTheme.accentOrange,
+                                  )),
+                            ))
+                        .toList(),
+                    rows: _currentEntries.asMap().entries.map((e) {
+                      final i = e.key;
+                      final entry = e.value;
+                      final pts = entry['points'] ?? 0;
+                      return DataRow(
+                        color: WidgetStateProperty.all(
+                          i.isEven ? AppTheme.cardDark : AppTheme.surfaceDark,
+                        ),
+                        cells: [
+                          DataCell(SizedBox(
+                            width: 100,
+                            child: Text(
+                              entry['user_name'] ?? '-',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )),
+                          _entryCell(entry['toss_winner']),
+                          _entryCell(entry['match_winner']),
+                          _entryCell('${entry['score'] ?? 0}'),
+                          _entryCell('${entry['total_wickets'] ?? 0}'),
+                          _entryCell('${entry['highest_score'] ?? 0}'),
+                          _entryCell(entry['mom']),
+                          DataCell(Text(
+                            '$pts',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: pts > 0 ? AppTheme.gold : Colors.white54,
+                            ),
+                          )),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ).animate().fadeIn(),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  DataCell _entryCell(dynamic value) {
+    final v = value?.toString() ?? '-';
+    return DataCell(Text(
+      v.isEmpty ? '-' : v,
+      style: const TextStyle(fontSize: 12),
+    ));
   }
 
   @override
@@ -608,75 +734,6 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Profile',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EntriesMatchCard extends StatelessWidget {
-  final Match match;
-  final VoidCallback onTap;
-
-  const _EntriesMatchCard({required this.match, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = DateFormat('MMM d, yyyy').format(match.startDateTime.toLocal());
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withAlpha(10)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.accentOrange.withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '#${match.matchId}',
-                style: const TextStyle(
-                  color: AppTheme.accentOrange,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${match.team1} vs ${match.team2}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    dateStr,
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(80),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right,
-                color: Colors.white38, size: 22),
-          ],
-        ),
       ),
     );
   }
