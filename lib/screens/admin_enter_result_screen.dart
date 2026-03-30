@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/match.dart';
 import '../models/actual.dart';
 import '../services/api_service.dart';
+import '../services/cricket_api_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 
@@ -28,6 +29,7 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
   bool _isSaving = false;
   bool _isScoring = false;
   bool _isLoadingExisting = true;
+  bool _isFetching = false;
   Match? _match;
   Actual? _existingActual;
 
@@ -57,6 +59,128 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
       }
     } catch (_) {}
     if (mounted) setState(() => _isLoadingExisting = false);
+  }
+
+  Future<void> _autoFetch() async {
+    final m = _match!;
+    if (m.cricApiId == null || m.espnEventId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('API IDs not configured for this match'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isFetching = true);
+    try {
+      final result = await CricketApiService.fetchMatchResult(
+        cricApiId: m.cricApiId!,
+        espnEventId: m.espnEventId!,
+      );
+
+      setState(() {
+        _tossWinner = result.tossWinner;
+        _matchWinner = result.matchWinner;
+        _momTeam = result.momTeam;
+        _scoreController.text = result.firstInningsScore.toString();
+        _wicketsController.text = result.totalWickets.toString();
+        _highestScoreController.text = result.highestScore.toString();
+        _highestScoreTied = result.highestScoreTied;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('All fields fetched. Review and save.'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isFetching = false);
+    }
+  }
+
+  Future<void> _autoFetchSaveAndScore() async {
+    final m = _match!;
+    if (m.cricApiId == null || m.espnEventId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('API IDs not configured for this match'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isFetching = true);
+    try {
+      final result = await CricketApiService.fetchMatchResult(
+        cricApiId: m.cricApiId!,
+        espnEventId: m.espnEventId!,
+      );
+
+      setState(() {
+        _tossWinner = result.tossWinner;
+        _matchWinner = result.matchWinner;
+        _momTeam = result.momTeam;
+        _scoreController.text = result.firstInningsScore.toString();
+        _wicketsController.text = result.totalWickets.toString();
+        _highestScoreController.text = result.highestScore.toString();
+        _highestScoreTied = result.highestScoreTied;
+      });
+
+      final actual = Actual(
+        matchId: m.matchId,
+        tossWinner: result.tossWinner,
+        score: result.firstInningsScore,
+        matchWinner: result.matchWinner,
+        mom: result.momTeam,
+        totalWickets: result.totalWickets,
+        highestScore: result.highestScore,
+        highestScoreTied: result.highestScoreTied,
+      );
+      await ApiService.submitActual(actual);
+      _existingActual = actual;
+
+      final count = await ApiService.calculatePoints(m.matchId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Done! Saved result & scored $count predictions.'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isFetching = false);
+    }
   }
 
   Future<void> _save() async {
@@ -202,7 +326,95 @@ class _AdminEnterResultScreenState extends State<AdminEnterResultScreen> {
                         ),
                       ).animate().fadeIn(),
 
-                      SizedBox(height: sectionGap),
+                      if (_existingActual == null &&
+                          _match!.cricApiId != null &&
+                          _match!.espnEventId != null) ...[
+                        SizedBox(height: sectionGap),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: _isFetching ? null : _autoFetchSaveAndScore,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: _isFetching
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.auto_awesome, size: 20),
+                            label: Text(_isFetching
+                                ? 'Fetching from APIs...'
+                                : 'Auto-Fetch, Save & Calculate'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            'One click: fetches all data → saves → calculates points',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withAlpha(60)),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            children: [
+                              Expanded(child: Divider(color: Colors.white.withAlpha(20))),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text('OR enter manually',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white.withAlpha(50))),
+                              ),
+                              Expanded(child: Divider(color: Colors.white.withAlpha(20))),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (_existingActual == null &&
+                          (_match!.cricApiId == null || _match!.espnEventId == null)) ...[
+                        SizedBox(height: sectionGap),
+                      ],
+                      if (_existingActual != null &&
+                          _match!.cricApiId != null &&
+                          _match!.espnEventId != null) ...[
+                        SizedBox(height: sectionGap),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 42,
+                          child: OutlinedButton.icon(
+                            onPressed: _isFetching ? null : _autoFetch,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: BorderSide(color: Colors.white.withAlpha(30)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: _isFetching
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white54),
+                                  )
+                                : const Icon(Icons.refresh, size: 18),
+                            label: const Text('Re-fetch from APIs',
+                                style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+                        SizedBox(height: sectionGap),
+                      ],
+
                       const _SectionTitle(title: 'Toss Winner'),
                       const SizedBox(height: 8),
                       Row(

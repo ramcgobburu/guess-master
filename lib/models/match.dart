@@ -8,6 +8,8 @@ class Match {
   final DateTime startDateTime;
   final bool isLocked;
   final String venue;
+  final String? cricApiId;
+  final String? espnEventId;
 
   Match({
     this.id,
@@ -19,6 +21,8 @@ class Match {
     required this.startDateTime,
     required this.isLocked,
     this.venue = '',
+    this.cricApiId,
+    this.espnEventId,
   });
 
   factory Match.fromSupabase(Map<String, dynamic> json) {
@@ -32,6 +36,8 @@ class Match {
       startDateTime: DateTime.parse(json['start_date_time']),
       isLocked: json['is_locked'] ?? false,
       venue: json['venue'] ?? '',
+      cricApiId: json['cric_api_id'],
+      espnEventId: json['espn_event_id'],
     );
   }
 
