@@ -150,18 +150,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             : 'Leaderboard'),
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.center,
           indicatorColor: AppTheme.accentOrange,
           labelColor: AppTheme.accentOrange,
           unselectedLabelColor: Colors.white54,
           labelStyle:
-              const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+              const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
+          indicatorSize: TabBarIndicatorSize.label,
           tabs: const [
             Tab(text: 'Standings'),
-            Tab(text: 'Points Split'),
-            Tab(text: 'Match Detail'),
+            Tab(text: 'Split'),
+            Tab(text: 'Detail'),
           ],
         ),
       ),
